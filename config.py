@@ -3,13 +3,21 @@ import os
 # Project-wide constants and configurations
 class Config:
     # Environment
-    DATA_DIR = "./data"
     RESULTS_DIR = "./results"
-    
+
+    # Dataset location. Real SWaT data is restricted-access (requires an NDA
+    # with iTrust, SUTD) and cannot be redistributed in this repository.
+    # `scripts/generate_synthetic_dataset.py` produces drop-in replacements
+    # with the same column/label schema so the pipeline is runnable out of
+    # the box; swap in the real files at the same paths when available.
+    DATASET_DIR = "dataset"
+    NORMAL_DATA_FILE = "normal.csv"
+    ATTACK_DATA_FILE = "attack.csv"
+
     # Simulation / Data specs
     NUM_STAGES = 6  # P1 to P6 in SWaT
     SEQ_LENGTH = 15 # Sliding window size for time series
-    TRAIN_SAMPLES_PER_STAGE = 1000
+    TRAIN_SAMPLES_PER_STAGE = 1500
     TEST_SAMPLES_PER_STAGE = 300
     ANOMALY_FRACTION = 0.1  # 10% of test data will be anomalous
 
@@ -36,5 +44,5 @@ class Config:
     EARLY_WARNING_CRITICAL_SCORE = 0.7  # Score triggering an alert
 
 # Ensure directories exist
-os.makedirs(Config.DATA_DIR, exist_ok=True)
+os.makedirs(Config.DATASET_DIR, exist_ok=True)
 os.makedirs(Config.RESULTS_DIR, exist_ok=True)

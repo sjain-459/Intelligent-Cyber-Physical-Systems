@@ -140,7 +140,7 @@ export default function App() {
       setStatus((prev) => (prev === 'completed' || prev === 'alert' ? prev : 'idle'));
     };
 
-    ws.onerror = (error) => {
+    ws.onerror = () => {
       setMessages((p) => [...p, "Connection Error: Backend unreachable."]);
       setStatus('idle');
     };
@@ -290,6 +290,9 @@ export default function App() {
               <div className="flex items-center gap-3 mb-6">
                 <ShieldAlert className="w-6 h-6 text-red-500 animate-pulse" />
                 <h3 className="text-lg font-bold text-red-400">Explainable AI (SHAP) Diagnostics</h3>
+                {anomalyIndex !== null && (
+                  <span className="ml-auto text-xs font-mono text-red-300/70">Window Index: {anomalyIndex}</span>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -307,7 +310,7 @@ export default function App() {
                     <div key={i} className="bg-slate-900/80 p-3 rounded-lg border-l-4 border-red-500">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-bold">{alert['Affected Component']}</span>
-                        <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">P{alert['Stage']}</span>
+                        <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">{alert['Stage']}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[10px] opacity-70">
                         <p>STRIDE: {alert['STRIDE Threat']}</p>

@@ -1,5 +1,7 @@
 import numpy as np
 
+from config import Config
+
 class ThreatIntelligence:
     def __init__(self):
         self.anomaly_history = []
@@ -12,12 +14,12 @@ class ThreatIntelligence:
         """
         current_error = float(np.mean(reconstruction_errors))
         self.anomaly_history.append(current_error)
-        
-        # Calculate EWMA
-        alpha = 0.3
+
+        # Calculate EWMA: S_t = alpha * e_t + (1 - alpha) * S_{t-1}
+        alpha = Config.EARLY_WARNING_ALPHA
         self.ewma_score = alpha * current_error + (1 - alpha) * self.ewma_score
-        
-        is_critical = self.ewma_score > 0.7  # Using dummy threshold for simulation
+
+        is_critical = self.ewma_score > Config.EARLY_WARNING_CRITICAL_SCORE
         return self.ewma_score, is_critical
 
     @staticmethod

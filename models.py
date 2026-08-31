@@ -10,7 +10,9 @@ class ConvSequenceAutoencoder(nn.Module):
     workarounds. 1D-CNN captures temporal patterns (Conv1d over time axis) 
     while remaining 100% compliant with Opacus PrivacyEngine.
     """
-    def __init__(self, seq_len=Config.SEQ_LENGTH, num_features=Config.NUM_FEATURES):
+    def __init__(self, seq_len=None, num_features=None):
+        seq_len = Config.SEQ_LENGTH if seq_len is None else seq_len
+        num_features = Config.NUM_FEATURES if num_features is None else num_features
         super(ConvSequenceAutoencoder, self).__init__()
         self.seq_len = seq_len
         self.num_features = num_features
