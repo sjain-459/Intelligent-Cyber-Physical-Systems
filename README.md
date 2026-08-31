@@ -159,11 +159,18 @@ The real **SWaT** dataset is distributed by iTrust, Singapore University of Tech
 python scripts/generate_synthetic_dataset.py
 ```
 
-**Option B — Real SWaT via Kaggle mirror.** A third-party mirror of the dataset exists on Kaggle; this is *not* an official iTrust distribution, so check its license/terms before relying on it for anything beyond personal research (for the authoritative source, request access directly from [iTrust](https://itrust.sutd.edu.sg/itrust-labs_datasets/)). Requires your own Kaggle account/API credentials (`~/.kaggle/kaggle.json` or `KAGGLE_USERNAME`/`KAGGLE_KEY`):
-```bash
-pip install -r requirements-kaggle.txt
-python scripts/download_kaggle_dataset.py
-```
+**Option B — Real SWaT via Kaggle mirror.** A third-party mirror of the dataset exists on [Kaggle](https://www.kaggle.com/datasets/vishala28/swat-dataset-secure-water-treatment-system); this is *not* an official iTrust distribution, so check its license/terms before relying on it for anything beyond personal research (for the authoritative source, request access directly from [iTrust](https://itrust.sutd.edu.sg/itrust-labs_datasets/)).
+
+- Automatic, needs your own Kaggle API credentials (`~/.kaggle/kaggle.json` or `KAGGLE_USERNAME`/`KAGGLE_KEY`):
+  ```bash
+  pip install -r requirements-kaggle.txt
+  python scripts/download_kaggle_dataset.py
+  ```
+- Manual, no API token needed — click "Download" on the Kaggle page above, extract the zip, then:
+  ```bash
+  python scripts/download_kaggle_dataset.py --source-dir /path/to/extracted/folder
+  ```
+
 Either way, the result is `dataset/normal.csv` + `dataset/attack.csv` (git-ignored — sensor data, real or synthetic, is never committed). The pipeline auto-sizes its per-stage feature padding to whichever dataset is present, so the real dataset's larger/uneven sensor counts per stage are never silently truncated.
 
 ### 🏃 Running

@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Activity, ShieldAlert, Cpu, Network, Server, Play, ShieldCheck, Database, Plus, X } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
+// The backend may be served from a different origin in production (e.g.
+// separate Render services for frontend/backend). VITE_API_BASE_URL (set at
+// build time) overrides the localhost default used for local development.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws');
+
 export default function App() {
   const [status, setStatus] = useState('idle'); // idle, starting, training, monitoring, alert, completed
   const [messages, setMessages] = useState([]);
@@ -79,7 +85,7 @@ export default function App() {
     }
     if (ev === 'fl_done') {
       setMessages((p) => [...p, "Federated Learning completed."]);
-      setMetricsImage(`http://localhost:8001/results/federated_metrics.png?t=${Date.now()}`);
+      setMetricsImage(`${API_BASE_URL}/results/federated_metrics.png?t=${Date.now()}`);
     }
     if (ev === 'threat_detect_start') {
       setStatus('monitoring');
@@ -125,7 +131,7 @@ export default function App() {
     setStatus('starting');
 
     // 3. Initialize WebSocket
-    const ws = new WebSocket('ws://localhost:8001/ws/simulation');
+    const ws = new WebSocket(`${WS_BASE_URL}/ws/simulation`);
 
     ws.onmessage = (event) => {
       try {

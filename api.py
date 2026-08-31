@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import asyncio
 from main import run_simulation_stream
@@ -6,6 +7,18 @@ import json
 import os
 
 app = FastAPI(title="CTMAS Simulation API")
+
+# The dashboard may be served from a different origin than this API (e.g.
+# separate Render services for frontend/backend). Restrict to an explicit
+# allow-list via ALLOWED_ORIGINS (comma-separated) in production; falls
+# back to "*" for local development, where there's no cross-origin risk.
+_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _allowed_origins.split(",")] if _allowed_origins != "*" else ["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 # Serve the 'results' directory to show plots on the frontend
 if not os.path.exists("results"):
@@ -43,4 +56,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))

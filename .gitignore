@@ -34,10 +34,13 @@ pytest_cache/
 # Environment variables
 .env
 .env.*
+!.env.example
+!**/.env.example
 
 # IDEs and editors
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 

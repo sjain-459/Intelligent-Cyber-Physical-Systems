@@ -15,15 +15,21 @@ requesting the dataset directly from iTrust for anything else.
 This script never commits the downloaded data anywhere -- `dataset/` is
 git-ignored, same as the synthetic files.
 
-Requirements:
-    pip install kagglehub
-    Kaggle credentials configured as usual (~/.kaggle/kaggle.json, or the
-    KAGGLE_USERNAME / KAGGLE_KEY environment variables). This script does
-    not read, request, or handle those credentials itself -- kagglehub
-    picks them up from your existing Kaggle configuration.
+Two ways to get the source files:
+
+1. Automatic (needs a Kaggle API token): `pip install kagglehub`, configure
+   credentials as usual (~/.kaggle/kaggle.json, or the KAGGLE_USERNAME /
+   KAGGLE_KEY environment variables) -- this script does not read, request,
+   or handle those credentials itself, kagglehub picks them up from your
+   existing Kaggle configuration -- then run with no arguments.
+2. Manual (no API token needed): click "Download" on the Kaggle page
+   (https://www.kaggle.com/datasets/vishala28/swat-dataset-secure-water-treatment-system),
+   extract the zip, then run with --source-dir pointing at the extracted
+   folder.
 
 Usage:
     python scripts/download_kaggle_dataset.py
+    python scripts/download_kaggle_dataset.py --source-dir ~/Downloads/swat-dataset-secure-water-treatment-system
 """
 import argparse
 import os
@@ -56,10 +62,15 @@ def _normalize(df):
     )
 
     # Sensor columns are sometimes exported with comma decimal separators.
+    # Checking `dtype == object` is not reliable here: pandas >= 3.0 uses a
+    # native `str` dtype for text columns instead of `object`, so that check
+    # silently never matches under the pandas version this project actually
+    # installs (pandas>=2.0 currently resolves to 3.x). Check numeric-ness
+    # directly instead, which is correct across pandas versions.
     for col in df.columns:
         if col in ("Timestamp", "Normal/Attack"):
             continue
-        if df[col].dtype == object:
+        if not pd.api.types.is_numeric_dtype(df[col]):
             df[col] = pd.to_numeric(
                 df[col].astype(str).str.replace(",", ".", regex=False),
                 errors="coerce",
@@ -79,6 +90,11 @@ def _find_file(root, keyword):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="Overwrite existing dataset/ files")
+    parser.add_argument(
+        "--source-dir",
+        help="Path to an already-downloaded-and-extracted copy of the Kaggle "
+        "dataset (skips kagglehub/API credentials entirely).",
+    )
     args = parser.parse_args()
 
     normal_out = os.path.join(Config.DATASET_DIR, Config.NORMAL_DATA_FILE)
@@ -87,19 +103,27 @@ def main():
         print(f"'{normal_out}' and '{attack_out}' already exist. Use --force to re-download.")
         return
 
-    try:
-        import kagglehub
-    except ImportError:
-        sys.exit(
-            "kagglehub is required for this script. Install it with:\n"
-            "    pip install kagglehub\n"
-            "and make sure your Kaggle API credentials are configured "
-            "(~/.kaggle/kaggle.json or KAGGLE_USERNAME/KAGGLE_KEY)."
-        )
+    if args.source_dir:
+        dataset_root = os.path.expanduser(args.source_dir)
+        if not os.path.isdir(dataset_root):
+            sys.exit(f"'{dataset_root}' is not a directory.")
+        print(f"Using local copy at: {dataset_root}")
+    else:
+        try:
+            import kagglehub
+        except ImportError:
+            sys.exit(
+                "kagglehub is required for automatic download. Install it with:\n"
+                "    pip install kagglehub\n"
+                "and make sure your Kaggle API credentials are configured "
+                "(~/.kaggle/kaggle.json or KAGGLE_USERNAME/KAGGLE_KEY).\n"
+                "Alternatively, download the dataset manually from Kaggle and "
+                "re-run with --source-dir pointing at the extracted folder."
+            )
 
-    print(f"Downloading '{KAGGLE_DATASET}' via kagglehub (uses your local Kaggle credentials)...")
-    dataset_root = kagglehub.dataset_download(KAGGLE_DATASET)
-    print(f"Downloaded to: {dataset_root}")
+        print(f"Downloading '{KAGGLE_DATASET}' via kagglehub (uses your local Kaggle credentials)...")
+        dataset_root = kagglehub.dataset_download(KAGGLE_DATASET)
+        print(f"Downloaded to: {dataset_root}")
 
     normal_src = _find_file(dataset_root, "normal")
     attack_src = _find_file(dataset_root, "attack")
