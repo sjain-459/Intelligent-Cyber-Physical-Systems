@@ -1,0 +1,2 @@
+-r requirements.txt
+kagglehub>=0.3

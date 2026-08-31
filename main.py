@@ -1,4 +1,6 @@
 import sys
+from collections import OrderedDict
+
 import numpy as np
 import flwr as fl
 import torch
@@ -12,6 +14,15 @@ from local_training import evaluate_model
 from threat_intelligence import ThreatIntelligence
 from xai_explainer import XAIExplainer
 from visualization import Visualizer
+
+
+def _load_parameters(model, parameters_ndarrays):
+    """Loads a flat list of ndarrays (as produced by Flower) into a model."""
+    params_dict = zip(model.state_dict().keys(), parameters_ndarrays)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    model.load_state_dict(state_dict, strict=True)
+    return model
+
 
 def run_simulation_stream():
     """Generates simulation events to be consumed by the frontend WebSocket or terminal output."""
@@ -78,21 +89,63 @@ def run_simulation_stream():
     yield {"event": "fl_done"}
 
     # --- Running Proactive Threat Detection Phase ---
-    yield {"event": "info", "message": "Running Proactive Threat Detection Phase (Post-Training Simulation)"}
-    
-    target_stage = 0
-    train_loader, test_loader, x_test, y_test, features = get_stage_dataloaders(target_stage)
-    
-    model = get_model()
-    
+    # Uses the trained global model (not a freshly-initialized one) so that
+    # reconstruction errors reflect what the federated network actually
+    # learned. All six process stages are scanned; the stage with the
+    # strongest anomaly signal is then explained in detail via SHAP.
+    yield {"event": "info", "message": "Running Proactive Threat Detection Phase using the trained global model across all process stages"}
+
+    final_ndarrays = fl.common.parameters_to_ndarrays(global_parameters)
+
+    stage_cache = {}
+    best_stage = 0
+    best_stage_score = -1.0
+
+    for stage_id in range(Config.NUM_CLIENTS):
+        stage_model = _load_parameters(get_model(), final_ndarrays)
+        train_loader, test_loader, x_test, y_test, features = get_stage_dataloaders(stage_id)
+
+        _, train_errors = evaluate_model(stage_model, train_loader, features)
+        train_mse = train_errors.mean(axis=(1, 2)) if train_errors.ndim == 3 else train_errors.mean(axis=1)
+        threshold = float(np.mean(train_mse) + Config.ANOMALY_THRESHOLD_MULTIPLIER * np.std(train_mse))
+
+        _, raw_errors = evaluate_model(stage_model, test_loader, features)
+        avg_errors = raw_errors.mean(axis=(1, 2)) if raw_errors.ndim == 3 else raw_errors.mean(axis=1)
+        max_error = float(avg_errors.max()) if len(avg_errors) else 0.0
+        anomaly_count = int(np.sum(avg_errors > threshold))
+
+        stage_cache[stage_id] = {
+            "model": stage_model,
+            "train_loader": train_loader,
+            "test_loader": test_loader,
+            "x_test": x_test,
+            "features": features,
+            "raw_errors": raw_errors,
+            "threshold": threshold,
+        }
+
+        yield {
+            "event": "stage_summary",
+            "stage": stage_id + 1,
+            "threshold": threshold,
+            "anomaly_count": anomaly_count,
+            "max_error": max_error,
+        }
+
+        if max_error > best_stage_score:
+            best_stage_score = max_error
+            best_stage = stage_id
+
+    target_stage = best_stage
+    cached = stage_cache[target_stage]
+    model = cached["model"]
+    train_loader = cached["train_loader"]
+    x_test = cached["x_test"]
+    features = cached["features"]
+    raw_errors = cached["raw_errors"]
+    threshold = cached["threshold"]
+
     yield {"event": "threat_detect_start", "target_stage": target_stage + 1}
-    loss, raw_errors = evaluate_model(model, test_loader, features)
-    
-    # Compute threshold from training data
-    _, train_errors = evaluate_model(model, train_loader, features)
-    train_mse = train_errors.mean(axis=(1, 2)) if train_errors.ndim == 3 else train_errors.mean(axis=1)
-    threshold = float(np.mean(train_mse) + Config.ANOMALY_THRESHOLD_MULTIPLIER * np.std(train_mse))
-    
     yield {"event": "threshold_computed", "threshold": threshold}
 
     threat_intel = ThreatIntelligence()
@@ -162,10 +215,18 @@ def main():
             print(f"Round {data['round']} completed. Aggregated metrics: {data['metrics']}")
         elif event == "fl_done":
             print("\n[+] Federated Learning completed. Global metrics plotted.")
+        elif event == "stage_summary":
+            print(
+                f"  Stage P{data['stage']}: threshold={data['threshold']:.4f}, "
+                f"anomalous windows={data['anomaly_count']}, max error={data['max_error']:.4f}"
+            )
         elif event == "threat_detect_start":
             print(f"Analyzing testing sequences for Stage P{data['target_stage']}...")
         elif event == "anomaly_detected":
-            print(f"\n[!] CRITICAL ANOMALY DETECTED at Window Index {data['index']} (EWMA Score > 0.7 or Above Threshold)")
+            print(
+                f"\n[!] CRITICAL ANOMALY DETECTED at Window Index {data['index']} "
+                f"(EWMA Score > {Config.EARLY_WARNING_CRITICAL_SCORE} or Above Threshold)"
+            )
         elif event == "xai_results":
             print("\n[+] XAI Interpretability Results (SHAP):")
             print(f"Top Contributing Sensors/Actuators: {data['features']}")
