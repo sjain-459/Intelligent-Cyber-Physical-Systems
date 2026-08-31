@@ -138,8 +138,7 @@ The system operates in four distinct phases, ensuring security at each layer of 
 
 ### 📦 Prerequisites
 - Python 3.9+
-- Node.js & npm (for Web Dashboard)
-- SWaT Dataset (`normal.csv` and `attack.csv` in `dataset/`)
+- Node.js & npm (for the Web Dashboard)
 
 ### 🛠️ Installation
 ```bash
@@ -151,12 +150,37 @@ cd frontend
 npm install
 ```
 
+### 📊 Dataset
+
+The real **SWaT** dataset is distributed by iTrust, Singapore University of Technology and Design, under a data-use agreement, and cannot be bundled with this repository. Pick one option:
+
+**Option A — Synthetic (default, zero setup).** Generates a schema-compatible stand-in (same per-stage sensor/actuator tags, injected spike/drift/actuator-flip attacks) so the whole pipeline runs end-to-end without external access:
+```bash
+python scripts/generate_synthetic_dataset.py
+```
+
+**Option B — Real SWaT via Kaggle mirror.** A third-party mirror of the dataset exists on Kaggle; this is *not* an official iTrust distribution, so check its license/terms before relying on it for anything beyond personal research (for the authoritative source, request access directly from [iTrust](https://itrust.sutd.edu.sg/itrust-labs_datasets/)). Requires your own Kaggle account/API credentials (`~/.kaggle/kaggle.json` or `KAGGLE_USERNAME`/`KAGGLE_KEY`):
+```bash
+pip install -r requirements-kaggle.txt
+python scripts/download_kaggle_dataset.py
+```
+Either way, the result is `dataset/normal.csv` + `dataset/attack.csv` (git-ignored — sensor data, real or synthetic, is never committed). The pipeline auto-sizes its per-stage feature padding to whichever dataset is present, so the real dataset's larger/uneven sensor counts per stage are never silently truncated.
+
 ### 🏃 Running
 - **Mode 1 (CLI)**: `python main.py`
 - **Mode 2 (Pro Web Dashboard)**:
   1. Start backend: `python api.py`
   2. Start frontend: `cd frontend && npm run dev`
   3. Navigate to `http://localhost:5173`
+
+### ✅ Testing
+```bash
+pip install -r requirements-dev.txt
+pytest -v
+```
+The suite covers stage-partitioning correctness (no cross-stage sensor leakage), model/Opacus compatibility, EWMA scoring, trust-aware aggregation (a poisoned client update is actually excluded), and SHAP attribution — generating the synthetic dataset automatically if it isn't already present.
+
+CI (`.github/workflows/ci.yml`) runs this suite plus a frontend lint/build on every push and pull request against `main`.
 
 ---
 
@@ -171,3 +195,28 @@ npm install
 | **Web Service** | FastAPI / Uvicorn |
 | **Web UI** | React / TailwindCSS / Recharts |
 | **Threat Intelligence** | MITRE ATT&CK / STRIDE |
+
+---
+
+## ⚠️ Scope & Limitations
+
+This project performs **model-driven proactive detection and post-detection threat labelling** — it does not perform a full Data-Flow-Diagram-based STRIDE exercise of the plant. Threats that don't manifest as a statistical deviation in reconstruction error (e.g. a purely network-layer attack that leaves physical process variables untouched) fall outside the current detection scope. The threat model also assumes the central aggregation server itself is not compromised and that a majority of federated clients are not compromised simultaneously.
+
+## 🗺️ Roadmap
+
+- [ ] Extend the STRIDE/MITRE rule table beyond sensor-prefix heuristics toward a learned or DFD-informed mapping
+- [ ] Persist federated round history / alerts to a database instead of in-memory + PNG snapshots
+- [ ] Containerized deployment (tracked separately — see repository issues)
+- [ ] Expand automated test coverage to the FastAPI WebSocket layer and the React dashboard
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. Please run `pytest -v` and `npm run lint && npm run build` (inside `frontend/`) before submitting a PR.
+
+## 📄 License
+
+Released under the [MIT License](LICENSE). Note this covers the CTMAS source code only — the SWaT dataset itself is distributed separately by iTrust, SUTD, under its own terms.
+
+## 📬 Contact
+
+Group 23, Department of Computer Science and Engineering, The LNM Institute of Information Technology, Jaipur — under the guidance of Dr. Ashish Kumar Dwivedi.
